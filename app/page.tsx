@@ -27,12 +27,23 @@ const SECTOR_COLORS: Record<string, string> = {
   "Hors secteur FCP": "#94a3b8",
 }
 
+const TYPE_COLORS: Record<string, { bg: string; color: string }> = {
+  "Fabricant":                { bg: "rgba(34,197,94,.15)",  color: "#22c55e" },
+  "Fabricant-Distributeur":   { bg: "rgba(34,197,94,.1)",   color: "#4ade80" },
+  "Distributeur":             { bg: "rgba(59,130,246,.15)", color: "#3b82f6" },
+  "Importateur":              { bg: "rgba(168,85,247,.15)", color: "#a855f7" },
+  "Importateur-Distributeur": { bg: "rgba(168,85,247,.1)",  color: "#c084fc" },
+  "Agent / Représentant":     { bg: "rgba(245,158,11,.15)", color: "#f59e0b" },
+  "Prestataire de services":  { bg: "rgba(100,116,139,.15)",color: "#64748b" },
+  "Négoce":                   { bg: "rgba(239,68,68,.12)",  color: "#ef4444" },
+}
+
 const SAMPLE = "MA0403400\tUnilever Maghreb\tCasablanca\nMA0424700\tAkzo Nobel Coatings\tCasablanca\nMA0428300\tAtlas Peinture\tMarrakech\nMA0434700\tBasf Maroc\tCasablanca\nMA0436000\tBayer\tCasablanca\nMA0463400\tCaoutchouc et Plastiques du Maghreb\tCasablanca\nMA0479800\tChérifienne des Sels\tCasablanca\nMA0480600\tChimicolor\tCasablanca\nMA2224770\tAir Liquide Maroc\tCasablanca\nMA2226243\tBiotal Cosmétics (usine)\tEl Jadida"
 
 interface Result {
   code: string; name: string; city: string; region: string
-  activite: string; sous_activite: string | null; site_web: string | null
-  confiance: number; raison: string; sources: string[]
+  activite: string; sous_activite: string | null; type_entreprise: string | null
+  site_web: string | null; confiance: number; raison: string; sources: string[]
 }
 
 function save(k: string, v: any) { try { localStorage.setItem(k, JSON.stringify(v)) } catch {} }
@@ -147,10 +158,11 @@ export default function Home() {
   const clearResults = () => { setResultsState([]); addLog('🗑 Résultats effacés localement') }
 
   const exportCSV = () => {
-    const h = ['Code','Nom','Ville','Région','Activité','Sous-activité','Site Web','Confiance','Raisonnement','Sources']
+    const h = ['Code','Nom','Ville','Région','Activité','Sous-activité','Type Entreprise','Site Web','Confiance','Raisonnement','Sources']
     const rows = results.map(r => [
       r.code, `"${r.name}"`, r.city, r.region,
       `"${r.activite}"`, `"${r.sous_activite||''}"`,
+      `"${r.type_entreprise||''}"`,
       r.site_web||'', Math.round(r.confiance*100)+'%',
       `"${(r.raison||'').replace(/"/g,'""')}"`,
       `"${(r.sources||[]).join(', ')}"`
@@ -298,12 +310,13 @@ export default function Home() {
         </div>
 
         {/* STATS */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:10,marginBottom:14}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:10,marginBottom:14}}>
           {[
             {l:'Total',v:companies.length||results.length,col:text},
             {l:'Traités',v:results.length,col:ACCENT},
             {l:'Restants',v:remaining,col:remaining>0?YELLOW:GREEN},
             {l:'Sites trouvés',v:results.filter(r=>r.site_web).length,col:'#22c55e'},
+            {l:'Fabricants',v:results.filter(r=>r.type_entreprise==='Fabricant'||r.type_entreprise==='Fabricant-Distributeur').length,col:'#22c55e'},
             {l:'Hors FCP',v:results.filter(r=>r.activite==='Hors secteur FCP').length,col:'#94a3b8'},
             {l:'Confiance > 80%',v:results.filter(r=>r.confiance>=.8).length,col:'#a78bfa'},
           ].map(s=>(
@@ -362,14 +375,14 @@ export default function Home() {
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
               <thead style={{position:'sticky',top:0,zIndex:10,background:theadBg}}>
                 <tr style={{borderBottom:`1px solid ${surfaceBorder}`}}>
-                  {['#','Code','Nom','Ville','Région','Activité','Sous-activité','Site Web','Conf.',''].map((h,i)=>(
+                  {['#','Code','Nom','Ville','Région','Activité','Sous-activité','Type','Site Web','Conf.',''].map((h,i)=>(
                     <th key={i} style={{padding:'10px 14px',textAlign:'left',fontSize:10,fontFamily:'monospace',textTransform:'uppercase',letterSpacing:'0.08em',color:textDim,whiteSpace:'nowrap'}}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {filtered.length===0&&(
-                  <tr><td colSpan={10} style={{padding:'48px 20px',textAlign:'center',color:textDim,fontFamily:'monospace'}}>
+                  <tr><td colSpan={11} style={{padding:'48px 20px',textAlign:'center',color:textDim,fontFamily:'monospace'}}>
                     {results.length===0?'Lancez l\'agent pour voir les résultats ⚡':'Aucun résultat pour ce filtre'}
                   </td></tr>
                 )}
@@ -398,6 +411,16 @@ export default function Home() {
                         {r.sous_activite ? <span style={{padding:'2px 7px',borderRadius:4,fontSize:10,background:D?'rgba(99,102,241,.1)':'rgba(99,102,241,.08)',color:ACCENT,border:`1px solid rgba(99,102,241,.2)`}}>{r.sous_activite}</span> : <span style={{color:textDim}}>—</span>}
                       </td>
                       <td style={{padding:'10px 14px'}}>
+                        {r.type_entreprise
+                          ? <span style={{padding:'3px 9px',borderRadius:20,fontSize:10,fontFamily:'monospace',fontWeight:700,whiteSpace:'nowrap',
+                              background:TYPE_COLORS[r.type_entreprise]?.bg||'rgba(100,116,139,.1)',
+                              color:TYPE_COLORS[r.type_entreprise]?.color||'#94a3b8',
+                              border:`1px solid ${TYPE_COLORS[r.type_entreprise]?.color||'#94a3b8'}40`}}>
+                              {r.type_entreprise}
+                            </span>
+                          : <span style={{color:textDim,fontSize:10}}>—</span>}
+                      </td>
+                      <td style={{padding:'10px 14px'}}>
                         {r.site_web
                           ?<a href={r.site_web.startsWith('http')?r.site_web:'https://'+r.site_web} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()}
                               style={{color:GREEN,fontSize:11,fontFamily:'monospace',textDecoration:'none'}}>
@@ -424,8 +447,12 @@ export default function Home() {
                               <p style={{margin:0,fontSize:12,color:text,lineHeight:1.7}}>{r.raison||'—'}</p>
                             </div>
                             <div>
-                              <p style={{margin:'0 0 8px',fontSize:10,fontFamily:'monospace',color:'#a78bfa',textTransform:'uppercase',letterSpacing:'0.1em'}}>📍 Localisation</p>
-                              <p style={{margin:0,fontSize:12,color:text}}><strong>Ville:</strong> {r.city}<br/><strong>Région:</strong> {r.region}</p>
+                              <p style={{margin:'0 0 8px',fontSize:10,fontFamily:'monospace',color:'#a78bfa',textTransform:'uppercase',letterSpacing:'0.1em'}}>📍 Localisation & Type</p>
+                              <p style={{margin:0,fontSize:12,color:text}}>
+                                <strong>Ville:</strong> {r.city}<br/>
+                                <strong>Région:</strong> {r.region}<br/>
+                                <strong>Type:</strong> {r.type_entreprise||'—'}
+                              </p>
                             </div>
                             {r.sources?.length>0&&(
                               <div style={{gridColumn:'1/-1'}}>

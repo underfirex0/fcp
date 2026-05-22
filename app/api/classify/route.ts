@@ -208,10 +208,21 @@ ${sectorsText}
 Basé sur ces données, classe cette entreprise.
 Si l'entreprise n'appartient pas clairement à un secteur FCP, mets "Hors secteur FCP" pour activite.
 
+Pour type_entreprise, choisis exactement une valeur parmi:
+- "Fabricant" = produit/fabrique lui-même (usine, manufacture, production propre)
+- "Distributeur" = revend des produits d'autres fabricants
+- "Importateur" = importe et revend des produits étrangers
+- "Importateur-Distributeur" = importe ET distribue
+- "Fabricant-Distributeur" = fabrique ET distribue
+- "Agent / Représentant" = représente des marques étrangères au Maroc
+- "Prestataire de services" = services, pas de produits physiques
+- "Négoce" = commerce général sans spécialisation claire
+
 Réponds UNIQUEMENT avec ce JSON (commence directement par {):
 {
   "activite": "nom exact du secteur ou Hors secteur FCP",
   "sous_activite": "sous-activité exacte ou null",
+  "type_entreprise": "exactement une des valeurs ci-dessus",
   "site_web": "url ou null",
   "confiance": 0.0 à 1.0,
   "raison": "explication courte avec preuves trouvées",
@@ -229,12 +240,13 @@ Réponds UNIQUEMENT avec ce JSON (commence directement par {):
   if (j === -1 || k === -1) throw new Error(`No JSON: ${text.substring(0, 80)}`)
   const result = JSON.parse(text.substring(j, k + 1))
 
-  log(`  ✅ ${result.activite} | ${result.sous_activite || '—'} | ${Math.round((result.confiance || 0) * 100)}%`)
+  log(`  ✅ ${result.activite} | ${result.type_entreprise || '—'} | ${Math.round((result.confiance || 0) * 100)}%`)
   if (result.site_web) log(`  🌐 ${result.site_web}`)
 
   const final = {
     code: company.code, name: company.name, city: company.city, region,
     activite: result.activite, sous_activite: result.sous_activite,
+    type_entreprise: result.type_entreprise,
     site_web: result.site_web, confiance: result.confiance,
     raison: result.raison, sources: result.sources
   }
@@ -267,7 +279,7 @@ export async function POST(req: NextRequest) {
       batch.map((c: { code: string; name: string; city: string }) =>
         classifyOne(c, anthropicKey, tavilyKey, supabaseUrl || '', supabaseKey || '')
           .catch(e => ({
-            result: { ...c, region: getRegion(c.city), activite: 'ERREUR', sous_activite: null, site_web: null, confiance: 0, raison: e.message, sources: [] },
+            result: { ...c, region: getRegion(c.city), activite: 'ERREUR', sous_activite: null, type_entreprise: null, site_web: null, confiance: 0, raison: e.message, sources: [] },
             logs: [`❌ ${c.name}: ${e.message}`]
           }))
       )
